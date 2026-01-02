@@ -2,23 +2,23 @@
 <table class="table table--condensed">
   <tbody>
     <tr>
-      <td><span class="label label--small">Elektri hind</span></td>
+      <td><span class="label label--small" id="electricity-price-label">Elektri hind</span></td>
       <td class="text--right"><span class="label label--small" id="current-electricity-price"></span></td>
     </tr>
     <tr>
-      <td><span class="label label--small">Edastamise tasu</span></td>
+      <td><span class="label label--small" id="transmission-cost-label">Edastamise tasu</span></td>
       <td class="text--right"><span class="label label--small" id="current-transmission-cost"></span></td>
     </tr>
     <tr>
-      <td><span class="label label--small">Taastuvenergia tasu</span></td>
+      <td><span class="label label--small" id="renewable-fee-label">Taastuvenergia tasu</span></td>
       <td class="text--right"><span class="label label--small" id="current-renewable-fee"></span></td>
     </tr>
     <tr>
-      <td><span class="label label--small">Elektriaktsiis</span></td>
+      <td><span class="label label--small" id="excise-label">Elektriaktsiis</span></td>
       <td class="text--right"><span class="label label--small" id="current-excise"></span></td>
     </tr>
     <tr>
-      <td><span class="label label--small">Müüja marginaal</span></td>
+      <td><span class="label label--small" id="margin-label">Müüja marginaal</span></td>
       <td class="text--right"><span class="label label--small" id="current-margin"></span></td>
     </tr>
   </tbody>
@@ -47,10 +47,61 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Data format: [year, month, day, hour, electricity_price, transmission_cost, renewable_energy_fee, electricity_excise]
+    // Translation definitions
+    const translations = {
+      electricityPrice: {
+        et: 'Elektri hind',
+        en: 'Electricity price'
+      },
+      transmissionCost: {
+        et: 'Edastamise tasu',
+        en: 'Transmission cost'
+      },
+      renewableEnergyFee: {
+        et: 'Taastuvenergia tasu',
+        en: 'Renewable energy fee'
+      },
+      electricityExcise: {
+        et: 'Elektriaktsiis',
+        en: 'Electricity excise'
+      },
+      margin: {
+        et: 'Müüja marginaal',
+        en: 'Seller margin'
+      },
+      cheapHours: {
+        et: 'Odavad tunnid',
+        en: 'Cheap hours'
+      }
+    }
+
+    const language = '{{ trmnl.plugin_settings.custom_fields_values.language }}' || 'et'
+
+    // Update translation labels
+    const electricityPriceLabelEl = document.getElementById('electricity-price-label')
+    if (electricityPriceLabelEl) electricityPriceLabelEl.textContent = translations.electricityPrice[language]
+
+    const transmissionCostLabelEl = document.getElementById('transmission-cost-label')
+    if (transmissionCostLabelEl) transmissionCostLabelEl.textContent = translations.transmissionCost[language]
+
+    const renewableFeeLabelEl = document.getElementById('renewable-fee-label')
+    if (renewableFeeLabelEl) renewableFeeLabelEl.textContent = translations.renewableEnergyFee[language]
+
+    const exciseLabelEl = document.getElementById('excise-label')
+    if (exciseLabelEl) exciseLabelEl.textContent = translations.electricityExcise[language]
+
+    const marginLabelEl = document.getElementById('margin-label')
+    if (marginLabelEl) marginLabelEl.textContent = translations.margin[language]
+
+    // Update cheap hours title
+    const cheapHoursTitleEl = document.getElementById('cheap-hours-title')
+    if (cheapHoursTitleEl) cheapHoursTitleEl.textContent = translations.cheapHours[language]
+
+    // Data format: [year, month, day, hour, minute, electricity_price, transmission_cost, renewable_energy_fee, electricity_excise]
     const rawData = {{ data | json }}
     const selectedTimespan = '{{ trmnl.plugin_settings.custom_fields_values.timespan }}'
     const margin = (parseFloat('{{ trmnl.plugin_settings.custom_fields_values.margin }}'.replace(',', '.')) || 0) / 100
+    const interval = parseInt('{{ trmnl.plugin_settings.custom_fields_values.interval }}') || 15
 
     // Data structure mapping for better maintainability
     const DATA_FIELDS = {
@@ -58,32 +109,32 @@
       month: 1,
       day: 2,
       hour: 3,
-      electricityPrice: 4,
-      transmissionCost: 5,
-      renewableEnergyFee: 6,
-      electricityExcise: 7
+      minute: 4,
+      electricityPrice: 5,
+      transmissionCost: 6,
+      renewableEnergyFee: 7,
+      electricityExcise: 8
     }
 
     // Metric configuration with data field mapping
     const METRICS = [
-      { key: 'electricityPrice', label: 'Elektri hind', field: DATA_FIELDS.electricityPrice },
-      { key: 'transmissionCost', label: 'Edastamise tasu', field: DATA_FIELDS.transmissionCost },
-      { key: 'renewableEnergyFee', label: 'Taastuvenergia tasu', field: DATA_FIELDS.renewableEnergyFee },
-      { key: 'electricityExcise', label: 'Elektriaktsiis', field: DATA_FIELDS.electricityExcise },
-      { key: 'margin', label: 'Müüja marginaal', value: margin }
+      { key: 'electricityPrice', label: translations.electricityPrice[language], field: DATA_FIELDS.electricityPrice },
+      { key: 'transmissionCost', label: translations.transmissionCost[language], field: DATA_FIELDS.transmissionCost },
+      { key: 'renewableEnergyFee', label: translations.renewableEnergyFee[language], field: DATA_FIELDS.renewableEnergyFee },
+      { key: 'electricityExcise', label: translations.electricityExcise[language], field: DATA_FIELDS.electricityExcise },
+      { key: 'margin', label: translations.margin[language], value: margin }
     ]
 
     // Find the lowest total cost time span of specified duration
-    function findLowestTimeSpan(prices, span) {
-      if (prices.length === 0) return { price: 0, start: '00', end: '01' }
+    function findLowestTimeSpan(prices, span, dataToUse) {
+      if (prices.length === 0) return { price: 0, start: '00:00', end: '01:00' }
 
-      // Calculate total price for each hour
+      // Calculate total price for each time slot (without margin, it's added to display later)
       const pricesSum = prices.map((x) =>
         x[DATA_FIELDS.electricityPrice] +
         x[DATA_FIELDS.transmissionCost] +
         x[DATA_FIELDS.renewableEnergyFee] +
-        x[DATA_FIELDS.electricityExcise] +
-        margin
+        x[DATA_FIELDS.electricityExcise]
       )
 
       let lowestSum = Infinity
@@ -92,71 +143,76 @@
       for (let i = 0; i < pricesSum.length - span + 1; i++) {
         const sum = pricesSum.slice(i, i + span).reduce((acc, val) => acc + val, 0)
 
-        if (sum < lowestSum) {
+        // Use < (not <=) to keep the earliest period when multiple periods have the same price
+        // Round to 4 decimal places to avoid floating-point precision issues
+        const roundedSum = Math.round(sum * 10000) / 10000
+        const roundedLowest = Math.round(lowestSum * 10000) / 10000
+        
+        if (roundedSum < roundedLowest) {
           lowestSum = sum
           lowestSumIndex = i
         }
       }
 
-      const startHour = rawData[lowestSumIndex][DATA_FIELDS.hour]
-      const endHour = rawData[lowestSumIndex + span] ? rawData[lowestSumIndex + span][DATA_FIELDS.hour] : (startHour + span) % 24
+      const startHour = dataToUse[lowestSumIndex][DATA_FIELDS.hour]
+      const startMinute = dataToUse[lowestSumIndex][DATA_FIELDS.minute]
+
+      // Calculate end time based on interval setting
+      const minutesPerSlot = interval === 60 ? 60 : 15
+      const totalMinutes = span * minutesPerSlot
+      const endDate = new Date()
+      endDate.setHours(startHour, startMinute + totalMinutes, 0, 0)
+      const endHour = endDate.getHours()
+      const endMinute = endDate.getMinutes()
 
       return {
-        start: startHour.toString().padStart(2, '0'),
-        end: endHour.toString().padStart(2, '0'),
-        price: (lowestSum / span) * 100 // Convert to cents
+        start: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
+        end: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`,
+        price: (lowestSum / span + margin) * 100 // Average price per slot + margin, convert to cents
       }
     }
 
-    // Calculate current period price accounting for partial hours
-    function getCurrentPeriodPrice(span, currentMinute = 0) {
-      if (rawData.length < span) return 0
+    // Prepare aggregated data based on interval setting BEFORE calculations
+    let aggregatedData = rawData
 
-      let totalPrice = 0
-      let totalMinutes = span * 60 // Total minutes in the period
-
-      for (let i = 0; i < span; i++) {
-        const hourData = rawData[i]
-        const hourPrice = (
-          hourData[DATA_FIELDS.electricityPrice] +
-          hourData[DATA_FIELDS.transmissionCost] +
-          hourData[DATA_FIELDS.renewableEnergyFee] +
-          hourData[DATA_FIELDS.electricityExcise] +
-          margin
-        )
-
-        let minutesInThisHour = 60
-
-        // For the first hour, subtract the minutes already passed
-        if (i === 0) {
-          minutesInThisHour = 60 - currentMinute
-        }
-
-        // For the last hour, we might not use the full hour
-        if (i === span - 1) {
-          const remainingMinutes = totalMinutes - ((i * 60) + (i === 0 ? (60 - currentMinute) : 60))
-          if (remainingMinutes < minutesInThisHour) {
-            minutesInThisHour = remainingMinutes
-          }
-        }
-
-        totalPrice += hourPrice * (minutesInThisHour / 60)
+    if (interval === 60) {
+      // Aggregate data into 1-hour intervals (average of 4 x 15min slots)
+      const hourlyData = []
+      
+      for (let i = 0; i < rawData.length; i += 4) {
+        const slots = rawData.slice(i, i + 4)
+        if (slots.length === 0) continue
+        
+        // Calculate average for each field
+        const avgRow = [
+          slots[0][DATA_FIELDS.year],
+          slots[0][DATA_FIELDS.month],
+          slots[0][DATA_FIELDS.day],
+          slots[0][DATA_FIELDS.hour],
+          0, // minute is always 0 for hourly
+          slots.reduce((sum, s) => sum + s[DATA_FIELDS.electricityPrice], 0) / slots.length,
+          slots.reduce((sum, s) => sum + s[DATA_FIELDS.transmissionCost], 0) / slots.length,
+          slots.reduce((sum, s) => sum + s[DATA_FIELDS.renewableEnergyFee], 0) / slots.length,
+          slots.reduce((sum, s) => sum + s[DATA_FIELDS.electricityExcise], 0) / slots.length
+        ]
+        hourlyData.push(avgRow)
       }
 
-      return (totalPrice / span) * 100 // Convert to cents and return average
+      aggregatedData = hourlyData
     }
 
     // Calculate current total price (first row total in cents)
-    const firstRowValues = rawData[0]
+    const firstRowValues = aggregatedData[0]
 
     // Get current time for display and calculations
     const currentHour = firstRowValues[DATA_FIELDS.hour].toString().padStart(2, '0')
-    const currentMinute = new Date().getMinutes() // This gets actual current minute
+    const currentMinute = firstRowValues[DATA_FIELDS.minute] // Use minute from data instead of actual current minute
     const currentTime = `${currentHour}:${currentMinute.toString().padStart(2, '0')}`
 
-    // Calculate end time for 1-hour period from current minute
-    const endMinute = currentMinute
-    const endHour = (firstRowValues[DATA_FIELDS.hour] + 1).toString().padStart(2, '0')
+    // Calculate end time based on interval setting
+    const minutesPerSlot = interval === 60 ? 60 : 15
+    const endMinute = (currentMinute + minutesPerSlot) % 60
+    const endHour = (firstRowValues[DATA_FIELDS.hour] + Math.floor((currentMinute + minutesPerSlot) / 60)).toString().padStart(2, '0')
     const endTime = `${endHour}:${endMinute.toString().padStart(2, '0')}`
 
     // Current price being charged right now (this very moment)
@@ -168,53 +224,50 @@
       margin
     ) * 100
 
-    // Calculate cheapest periods
-    const cheapest1h = findLowestTimeSpan(rawData, 1)
-    const cheapest2h = findLowestTimeSpan(rawData, 2)
-    const cheapest3h = findLowestTimeSpan(rawData, 3)
-    const cheapest4h = findLowestTimeSpan(rawData, 4)
-
-    // Calculate current period prices accounting for partial hours
-    const current1hPrice = getCurrentPeriodPrice(1, currentMinute)
-    const current2hPrice = getCurrentPeriodPrice(2, currentMinute)
-    const current3hPrice = getCurrentPeriodPrice(3, currentMinute)
-    const current4hPrice = getCurrentPeriodPrice(4, currentMinute)
+    // Calculate cheapest periods using aggregated data
+    // For 15min interval: 1h = 4 slots, 2h = 8 slots, etc.
+    // For 60min interval: 1h = 1 slot, 2h = 2 slots, etc.
+    const slotsPerHour = interval === 60 ? 1 : 4
+    const cheapest1h = findLowestTimeSpan(aggregatedData, 1 * slotsPerHour, aggregatedData)
+    const cheapest2h = findLowestTimeSpan(aggregatedData, 2 * slotsPerHour, aggregatedData)
+    const cheapest3h = findLowestTimeSpan(aggregatedData, 3 * slotsPerHour, aggregatedData)
+    const cheapest4h = findLowestTimeSpan(aggregatedData, 4 * slotsPerHour, aggregatedData)
 
     // Update the displayed values
     const displayItems = [
       {
         value: currentPrice.toFixed(2),
-        label: `${currentHour}:00 – ${endHour}:00`,
-        startTime: `${currentHour}:00`,
-        endTime: `${endHour}:00`,
+        label: `${currentHour}:${currentMinute.toString().padStart(2, '0')} – ${endHour}:${endMinute.toString().padStart(2, '0')}`,
+        startTime: `${currentHour}:${currentMinute.toString().padStart(2, '0')}`,
+        endTime: `${endHour}:${endMinute.toString().padStart(2, '0')}`,
         difference: null // Current price has no difference to itself
       },
       {
         value: cheapest1h.price.toFixed(2),
-        label: `${cheapest1h.start}:00 – ${cheapest1h.end}:00`,
-        startTime: `${cheapest1h.start}:00`,
-        endTime: `${cheapest1h.end}:00`,
+        label: `${cheapest1h.start} – ${cheapest1h.end}`,
+        startTime: cheapest1h.start,
+        endTime: cheapest1h.end,
         difference: Math.round((currentPrice - cheapest1h.price) / currentPrice * 100) // Percentage difference (rounded)
       },
       {
         value: cheapest2h.price.toFixed(2),
-        label: `${cheapest2h.start}:00 – ${cheapest2h.end}:00`,
-        startTime: `${cheapest2h.start}:00`,
-        endTime: `${cheapest2h.end}:00`,
+        label: `${cheapest2h.start} – ${cheapest2h.end}`,
+        startTime: cheapest2h.start,
+        endTime: cheapest2h.end,
         difference: Math.round((currentPrice - cheapest2h.price) / currentPrice * 100) // Percentage difference (rounded)
       },
       {
         value: cheapest3h.price.toFixed(2),
-        label: `${cheapest3h.start}:00 – ${cheapest3h.end}:00`,
-        startTime: `${cheapest3h.start}:00`,
-        endTime: `${cheapest3h.end}:00`,
+        label: `${cheapest3h.start} – ${cheapest3h.end}`,
+        startTime: cheapest3h.start,
+        endTime: cheapest3h.end,
         difference: Math.round((currentPrice - cheapest3h.price) / currentPrice * 100) // Percentage difference (rounded)
       },
       {
         value: cheapest4h.price.toFixed(2),
-        label: `${cheapest4h.start}:00 – ${cheapest4h.end}:00`,
-        startTime: `${cheapest4h.start}:00`,
-        endTime: `${cheapest4h.end}:00`,
+        label: `${cheapest4h.start} – ${cheapest4h.end}`,
+        startTime: cheapest4h.start,
+        endTime: cheapest4h.end,
         difference: Math.round((currentPrice - cheapest4h.price) / currentPrice * 100) // Percentage difference (rounded)
       }
     ]
@@ -309,25 +362,40 @@
     if (currentExciseEl) currentExciseEl.textContent = (firstRowValues[DATA_FIELDS.electricityExcise] * 100).toFixed(2)
 
     const currentMarginEl = document.getElementById('current-margin')
-    if (currentMarginEl) currentMarginEl.textContent = (margin * 100)
+    if (currentMarginEl) currentMarginEl.textContent = (margin * 100).toFixed(3)
 
-    // Prepare chart data
-    // Convert hours to formatted categories for x-axis
-    const categories = rawData.map(x => x[DATA_FIELDS.hour].toString().padStart(2, '0'))
+    // Prepare chart data based on interval setting (use aggregatedData)
+    let chartData = aggregatedData
+    let categories = []
+
+    if (interval === 60) {
+      categories = chartData.map(x => {
+        const hour = x[DATA_FIELDS.hour].toString().padStart(2, '0')
+        return hour
+      })
+    } else {
+      // Use 15-minute intervals - show all times but only label full hours
+      categories = chartData.map(x => {
+        const hour = x[DATA_FIELDS.hour].toString().padStart(2, '0')
+        const minute = x[DATA_FIELDS.minute].toString().padStart(2, '0')
+        // Show full time for all, but we'll style only hours in xAxis formatter
+        return `${hour}:${minute}`
+      })
+    }
 
     // Transform data into chart series format (convert to cents)
     const formattedBarData = METRICS.map(metric => ({
       name: metric.label,
-      data: rawData.map(x => (metric.value || x[metric.field]) * 100)
+      data: chartData.map(x => (metric.value || x[metric.field]) * 100)
     }))
 
-    // Initialize Highcharts stacked column chart
+    // Initialize Highcharts chart (spline for 15min, stacked column for 60min)
     Highcharts.chart('example-bar-chart', {
       accessibility: {
         enabled: false
       },
       chart: {
-        type: 'column',
+        type: interval === 15 ? 'areaspline' : 'column',
         height: null,
         width: null,
         animation: false,
@@ -351,7 +419,14 @@
         column: {
           pointPadding: 0.05,
           groupPadding: 0.1,
-          borderWidth: 0
+          borderWidth: 0,
+          borderRadius: 0
+        },
+        areaspline: {
+          lineWidth: 1,
+          marker: {
+            enabled: false
+          }
         }
       },
       // Data series with distinct visual styles for each metric
@@ -418,7 +493,17 @@
         categories: categories,
         labels: {
           style: { fontSize: '16px', color: '#000000' },
-          y: 20
+          y: 20,
+          rotation: 0,
+          align: 'center',
+          step: interval === 15 ? 4 : 1,
+          formatter: function() {
+            // For 15min interval, extract just the hour from HH:MM format
+            if (interval === 15 && this.value && this.value.includes(':')) {
+              return this.value.split(':')[0]
+            }
+            return this.value
+          }
         },
         gridLineDashStyle: 'dot',
         gridLineColor: '#000000',

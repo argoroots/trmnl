@@ -31,6 +31,15 @@ custom_fields:
   field_type: string
   name: Seller Margin
   description: Set the margin (cents/kWh) that your electricity seller adds to the base price. This is used to calculate the total cost of electricity.
+- keyname: interval
+  name: Chart Interval
+  description: Choose the time interval for the price chart. 15min shows detailed quarter-hour data, 1h shows hourly averages.
+  field_type: select
+  options:
+  - 15 minutes: 15
+  - 1 hour: 60
+  default: 15
+  optional: false
 - keyname: timespan
   field_type: select
   name: Highlighted Timespan
@@ -41,5 +50,14 @@ custom_fields:
   - 2 hours: 2
   - 3 hours: 3
   - 4 hours: 4
+- keyname: language
+  name: Language
+  description: Language for price labels and interface text.
+  field_type: select
+  options:
+  - Eesti keel: et
+  - English: en
+  default: et
+  optional: false
 name: Börsihind.ee
 refresh_interval: 15
