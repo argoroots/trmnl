@@ -10,12 +10,8 @@
       <td class="text--right"><span class="label label--small" id="current-transmission-cost"></span></td>
     </tr>
     <tr>
-      <td><span class="label label--small" id="renewable-fee-label">Taastuvenergia tasu</span></td>
-      <td class="text--right"><span class="label label--small" id="current-renewable-fee"></span></td>
-    </tr>
-    <tr>
-      <td><span class="label label--small" id="excise-label">Elektriaktsiis</span></td>
-      <td class="text--right"><span class="label label--small" id="current-excise"></span></td>
+      <td><span class="label label--small" id="state-fees-label">Riigi maksud</span></td>
+      <td class="text--right"><span class="label label--small" id="current-state-fees"></span></td>
     </tr>
     <tr>
       <td><span class="label label--small" id="margin-label">Müüja marginaal</span></td>
@@ -57,13 +53,9 @@
         et: 'Edastamise tasu',
         en: 'Transmission cost'
       },
-      renewableEnergyFee: {
-        et: 'Taastuvenergia tasu',
-        en: 'Renewable energy fee'
-      },
-      electricityExcise: {
-        et: 'Elektriaktsiis',
-        en: 'Electricity excise'
+      stateFees: {
+        et: 'Riigi maksud',
+        en: 'State taxes'
       },
       margin: {
         et: 'Müüja marginaal',
@@ -84,11 +76,8 @@
     const transmissionCostLabelEl = document.getElementById('transmission-cost-label')
     if (transmissionCostLabelEl) transmissionCostLabelEl.textContent = translations.transmissionCost[language]
 
-    const renewableFeeLabelEl = document.getElementById('renewable-fee-label')
-    if (renewableFeeLabelEl) renewableFeeLabelEl.textContent = translations.renewableEnergyFee[language]
-
-    const exciseLabelEl = document.getElementById('excise-label')
-    if (exciseLabelEl) exciseLabelEl.textContent = translations.electricityExcise[language]
+    const stateFeesLabelEl = document.getElementById('state-fees-label')
+    if (stateFeesLabelEl) stateFeesLabelEl.textContent = translations.stateFees[language]
 
     const marginLabelEl = document.getElementById('margin-label')
     if (marginLabelEl) marginLabelEl.textContent = translations.margin[language]
@@ -97,7 +86,7 @@
     const cheapHoursTitleEl = document.getElementById('cheap-hours-title')
     if (cheapHoursTitleEl) cheapHoursTitleEl.textContent = translations.cheapHours[language]
 
-    // Data format: [year, month, day, hour, minute, electricity_price, transmission_cost, renewable_energy_fee, electricity_excise]
+    // Data format: [year, month, day, hour, minute, electricity_price, transmission_cost, renewable_energy_fee, equipment_insurance_fee, electricity_excise]
     const rawData = {{ data | json }}
     const selectedTimespan = '{{ trmnl.plugin_settings.custom_fields_values.timespan }}'
     const margin = (parseFloat('{{ trmnl.plugin_settings.custom_fields_values.margin }}'.replace(',', '.')) || 0) / 100
@@ -113,15 +102,15 @@
       electricityPrice: 5,
       transmissionCost: 6,
       renewableEnergyFee: 7,
-      electricityExcise: 8
+      equipmentInsuranceFee: 8,
+      electricityExcise: 9
     }
 
     // Metric configuration with data field mapping
     const METRICS = [
       { key: 'electricityPrice', label: translations.electricityPrice[language], field: DATA_FIELDS.electricityPrice },
       { key: 'transmissionCost', label: translations.transmissionCost[language], field: DATA_FIELDS.transmissionCost },
-      { key: 'renewableEnergyFee', label: translations.renewableEnergyFee[language], field: DATA_FIELDS.renewableEnergyFee },
-      { key: 'electricityExcise', label: translations.electricityExcise[language], field: DATA_FIELDS.electricityExcise },
+      { key: 'stateFees', label: translations.stateFees[language], fields: [DATA_FIELDS.renewableEnergyFee, DATA_FIELDS.equipmentInsuranceFee, DATA_FIELDS.electricityExcise] },
       { key: 'margin', label: translations.margin[language], value: margin }
     ]
 
@@ -134,6 +123,7 @@
         x[DATA_FIELDS.electricityPrice] +
         x[DATA_FIELDS.transmissionCost] +
         x[DATA_FIELDS.renewableEnergyFee] +
+        x[DATA_FIELDS.equipmentInsuranceFee] +
         x[DATA_FIELDS.electricityExcise]
       )
 
@@ -193,6 +183,7 @@
           slots.reduce((sum, s) => sum + s[DATA_FIELDS.electricityPrice], 0) / slots.length,
           slots.reduce((sum, s) => sum + s[DATA_FIELDS.transmissionCost], 0) / slots.length,
           slots.reduce((sum, s) => sum + s[DATA_FIELDS.renewableEnergyFee], 0) / slots.length,
+          slots.reduce((sum, s) => sum + s[DATA_FIELDS.equipmentInsuranceFee], 0) / slots.length,
           slots.reduce((sum, s) => sum + s[DATA_FIELDS.electricityExcise], 0) / slots.length
         ]
         hourlyData.push(avgRow)
@@ -220,6 +211,7 @@
       firstRowValues[DATA_FIELDS.electricityPrice] +
       firstRowValues[DATA_FIELDS.transmissionCost] +
       firstRowValues[DATA_FIELDS.renewableEnergyFee] +
+      firstRowValues[DATA_FIELDS.equipmentInsuranceFee] +
       firstRowValues[DATA_FIELDS.electricityExcise] +
       margin
     ) * 100
@@ -355,11 +347,13 @@
     const currentTransmissionCostEl = document.getElementById('current-transmission-cost')
     if (currentTransmissionCostEl) currentTransmissionCostEl.textContent = (firstRowValues[DATA_FIELDS.transmissionCost] * 100).toFixed(2)
 
-    const currentRenewableFeeEl = document.getElementById('current-renewable-fee')
-    if (currentRenewableFeeEl) currentRenewableFeeEl.textContent = (firstRowValues[DATA_FIELDS.renewableEnergyFee] * 100).toFixed(2)
-
-    const currentExciseEl = document.getElementById('current-excise')
-    if (currentExciseEl) currentExciseEl.textContent = (firstRowValues[DATA_FIELDS.electricityExcise] * 100).toFixed(2)
+    const currentStateFeesEl = document.getElementById('current-state-fees')
+    if (currentStateFeesEl) {
+      const stateFees = (firstRowValues[DATA_FIELDS.renewableEnergyFee] + 
+                         firstRowValues[DATA_FIELDS.equipmentInsuranceFee] + 
+                         firstRowValues[DATA_FIELDS.electricityExcise]) * 100
+      currentStateFeesEl.textContent = stateFees.toFixed(2)
+    }
 
     const currentMarginEl = document.getElementById('current-margin')
     if (currentMarginEl) currentMarginEl.textContent = (margin * 100).toFixed(3)
@@ -384,10 +378,19 @@
     }
 
     // Transform data into chart series format (convert to cents)
-    const formattedBarData = METRICS.map(metric => ({
-      name: metric.label,
-      data: chartData.map(x => (metric.value || x[metric.field]) * 100)
-    }))
+    const formattedBarData = METRICS.map(metric => {
+      if (metric.fields) {
+        // Combined metric - sum multiple fields
+        return {
+          name: metric.label,
+          data: chartData.map(x => metric.fields.reduce((sum, field) => sum + x[field], 0) * 100)
+        }
+      }
+      return {
+        name: metric.label,
+        data: chartData.map(x => (metric.value || x[metric.field]) * 100)
+      }
+    })
 
     // Initialize Highcharts chart (spline for 15min, stacked column for 60min)
     Highcharts.chart('example-bar-chart', {
@@ -460,16 +463,6 @@
         color: {
           pattern: {
             image: 'https://usetrmnl.com/images/grayscale/gray-4.png',
-            width: 12,
-            height: 12
-          }
-        }
-      }, {
-        data: formattedBarData[4].data,
-        name: formattedBarData[4].name,
-        color: {
-          pattern: {
-            image: 'https://usetrmnl.com/images/grayscale/gray-5.png',
             width: 12,
             height: 12
           }
