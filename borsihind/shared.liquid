@@ -87,10 +87,37 @@
     if (cheapHoursTitleEl) cheapHoursTitleEl.textContent = translations.cheapHours[language]
 
     // Data format: [year, month, day, hour, minute, electricity_price, transmission_cost, renewable_energy_fee, equipment_insurance_fee, electricity_excise]
-    const rawData = {{ data | json }}
+    // Load only the data we need based on interval setting - IDX_0 = 1h intervals, IDX_1 = 15min intervals
+    const hourlyData = {{ IDX_0 | json }}
+    const quarterHourlyData = {{ IDX_1 | json }}
     const selectedTimespan = '{{ trmnl.plugin_settings.custom_fields_values.timespan }}'
-    const margin = (parseFloat('{{ trmnl.plugin_settings.custom_fields_values.margin }}'.replace(',', '.')) || 0) / 100
     const interval = parseInt('{{ trmnl.plugin_settings.custom_fields_values.interval }}') || 15
+    const margin = (parseFloat('{{ trmnl.plugin_settings.custom_fields_values.margin }}'.replace(',', '.')) || 0) / 100
+    let rawData = interval === 60 ? hourlyData.data : quarterHourlyData.data
+
+    // Filter out old data - keep only from current time rounded to interval
+    const now = new Date()
+    const currentActualHour = now.getHours()
+    const currentActualMinute = now.getMinutes()
+    
+    // Round down to nearest interval
+    let roundedMinute
+    if (interval === 60) {
+      roundedMinute = 0
+    } else {
+      // Round down to nearest 15-minute interval (0, 15, 30, 45)
+      roundedMinute = Math.floor(currentActualMinute / 15) * 15
+    }
+    
+    // Filter rawData to keep only entries from the rounded current time forward
+    rawData = rawData.filter(row => {
+      const rowHour = row[3] // hour is at index 3
+      const rowMinute = row[4] // minute is at index 4
+      
+      if (rowHour > currentActualHour) return true
+      if (rowHour === currentActualHour && rowMinute >= roundedMinute) return true
+      return false
+    })
 
     // Data structure mapping for better maintainability
     const DATA_FIELDS = {
@@ -137,7 +164,7 @@
         // Round to 4 decimal places to avoid floating-point precision issues
         const roundedSum = Math.round(sum * 10000) / 10000
         const roundedLowest = Math.round(lowestSum * 10000) / 10000
-        
+
         if (roundedSum < roundedLowest) {
           lowestSum = sum
           lowestSumIndex = i
@@ -162,38 +189,8 @@
       }
     }
 
-    // Prepare aggregated data based on interval setting BEFORE calculations
-    let aggregatedData = rawData
-
-    if (interval === 60) {
-      // Aggregate data into 1-hour intervals (average of 4 x 15min slots)
-      const hourlyData = []
-      
-      for (let i = 0; i < rawData.length; i += 4) {
-        const slots = rawData.slice(i, i + 4)
-        if (slots.length === 0) continue
-        
-        // Calculate average for each field
-        const avgRow = [
-          slots[0][DATA_FIELDS.year],
-          slots[0][DATA_FIELDS.month],
-          slots[0][DATA_FIELDS.day],
-          slots[0][DATA_FIELDS.hour],
-          0, // minute is always 0 for hourly
-          slots.reduce((sum, s) => sum + s[DATA_FIELDS.electricityPrice], 0) / slots.length,
-          slots.reduce((sum, s) => sum + s[DATA_FIELDS.transmissionCost], 0) / slots.length,
-          slots.reduce((sum, s) => sum + s[DATA_FIELDS.renewableEnergyFee], 0) / slots.length,
-          slots.reduce((sum, s) => sum + s[DATA_FIELDS.equipmentInsuranceFee], 0) / slots.length,
-          slots.reduce((sum, s) => sum + s[DATA_FIELDS.electricityExcise], 0) / slots.length
-        ]
-        hourlyData.push(avgRow)
-      }
-
-      aggregatedData = hourlyData
-    }
-
     // Calculate current total price (first row total in cents)
-    const firstRowValues = aggregatedData[0]
+    const firstRowValues = rawData[0]
 
     // Get current time for display and calculations
     const currentHour = firstRowValues[DATA_FIELDS.hour].toString().padStart(2, '0')
@@ -216,14 +213,14 @@
       margin
     ) * 100
 
-    // Calculate cheapest periods using aggregated data
+    // Calculate cheapest periods
     // For 15min interval: 1h = 4 slots, 2h = 8 slots, etc.
     // For 60min interval: 1h = 1 slot, 2h = 2 slots, etc.
     const slotsPerHour = interval === 60 ? 1 : 4
-    const cheapest1h = findLowestTimeSpan(aggregatedData, 1 * slotsPerHour, aggregatedData)
-    const cheapest2h = findLowestTimeSpan(aggregatedData, 2 * slotsPerHour, aggregatedData)
-    const cheapest3h = findLowestTimeSpan(aggregatedData, 3 * slotsPerHour, aggregatedData)
-    const cheapest4h = findLowestTimeSpan(aggregatedData, 4 * slotsPerHour, aggregatedData)
+    const cheapest1h = findLowestTimeSpan(rawData, 1 * slotsPerHour, rawData)
+    const cheapest2h = findLowestTimeSpan(rawData, 2 * slotsPerHour, rawData)
+    const cheapest3h = findLowestTimeSpan(rawData, 3 * slotsPerHour, rawData)
+    const cheapest4h = findLowestTimeSpan(rawData, 4 * slotsPerHour, rawData)
 
     // Update the displayed values
     const displayItems = [
@@ -349,8 +346,8 @@
 
     const currentStateFeesEl = document.getElementById('current-state-fees')
     if (currentStateFeesEl) {
-      const stateFees = (firstRowValues[DATA_FIELDS.renewableEnergyFee] + 
-                         firstRowValues[DATA_FIELDS.equipmentInsuranceFee] + 
+      const stateFees = (firstRowValues[DATA_FIELDS.renewableEnergyFee] +
+                         firstRowValues[DATA_FIELDS.equipmentInsuranceFee] +
                          firstRowValues[DATA_FIELDS.electricityExcise]) * 100
       currentStateFeesEl.textContent = stateFees.toFixed(2)
     }
@@ -358,8 +355,8 @@
     const currentMarginEl = document.getElementById('current-margin')
     if (currentMarginEl) currentMarginEl.textContent = (margin * 100).toFixed(3)
 
-    // Prepare chart data based on interval setting (use aggregatedData)
-    let chartData = aggregatedData
+    // Prepare chart data
+    let chartData = rawData
     let categories = []
 
     if (interval === 60) {
