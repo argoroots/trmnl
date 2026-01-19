@@ -110,13 +110,12 @@
     }
     
     // Filter rawData to keep only entries from the rounded current time forward
+    // Compare full datetime to handle midnight crossover correctly
+    const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), currentActualHour, roundedMinute)
+    
     rawData = rawData.filter(row => {
-      const rowHour = row[3] // hour is at index 3
-      const rowMinute = row[4] // minute is at index 4
-      
-      if (rowHour > currentActualHour) return true
-      if (rowHour === currentActualHour && rowMinute >= roundedMinute) return true
-      return false
+      const rowDate = new Date(row[0], row[1] - 1, row[2], row[3], row[4]) // year, month (0-indexed), day, hour, minute
+      return rowDate >= currentDate
     })
 
     // Data structure mapping for better maintainability
