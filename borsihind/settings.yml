@@ -4,7 +4,10 @@ no_screen_padding: 'no'
 dark_mode: 'no'
 static_data: ''
 polling_verb: get
-polling_url: https://argoroots-public.s3.eu-central-1.amazonaws.com/borsihind/{{ plan }}.json
+framework_version: 3.1.8
+serverless_language: ''
+refresh_interval_floor:
+polling_url: "https://borsihind.s3.eu-central-1.amazonaws.com/{{ plan }}.json\r\nhttps://borsihind.s3.eu-central-1.amazonaws.com/15min/{{ plan }}.json"
 polling_headers: ''
 polling_body: ''
 id: 122983
@@ -60,4 +63,5 @@ custom_fields:
   default: et
   optional: false
 name: Börsihind.ee
+description: Real-time Estonian electric prices
 refresh_interval: 15
