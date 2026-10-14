@@ -13,7 +13,7 @@ Displays Estonian electricity prices from [Börsihind.ee](https://börsihind.ee)
 - **Visual Chart**: Stacked column chart showing hourly price breakdown for the day
 - **Multiple Layout Options**: Supports full, half horizontal, half vertical, and quadrant layouts
 
-**Location:** `/borsihind/`
+**Location:** [`@argoroots/borsihind/`](https://github.com/argoroots/borsihind)
 
 ## 2. Family Calendar - iCal Parser
 
